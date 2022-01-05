@@ -139,4 +139,4 @@ declare module "kijs" {
   }
 }
 
-export { installer as default, queue, dequeue, _queueHooks };
+export { installer as default, queue, dequeue, _queueHooks, Callbacks };
