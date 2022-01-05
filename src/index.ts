@@ -1,8 +1,15 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Kijs } from "kijs";
 
-const dataPriv = new WeakMap<any, Map<string, any[]>>();
+// eslint-disable-next-line functional/prefer-readonly-type
+const dataPriv = new WeakMap<any, Map<string, any>>();
 
-class Callbacks extends Promise {
+class Callbacks<T = void> extends Promise<T> {
+  // eslint-disable-next-line functional/prefer-readonly-type
+  resolve?: (value: T | PromiseLike<T>) => void;
+  // eslint-disable-next-line functional/prefer-readonly-type
+  reject?: (value: T | PromiseLike<T>) => void;
   static get [Symbol.species]() {
     return Promise;
   }
@@ -10,58 +17,61 @@ class Callbacks extends Promise {
     return "Callbacks";
   }
 
-  constructor(cb: Function) {
+  constructor(
+    cb: ((value: void) => void | PromiseLike<void>) | null | undefined
+  ) {
     super((resolve, reject) => {
       this.resolve = resolve;
       this.reject = reject;
     });
 
-    this.then(cb);
+    (this as unknown as Promise<void>).catch(cb);
   }
 }
 
-function queue(elem: any, type: string, data: any): any[] | void {
-  if (elem) {
-    type = (type || "fx") + "queue";
+function queue(elem: any, type: string, data?: any): any {
+  type = (type || "fx") + "queue";
 
-    if (dataPriv.has(elem) === false) {
-      dataPriv.set(elem, new Map());
-    }
-    let queue = dataPriv.get(elem)!.get(type);
-
-    // Speed up dequeue by getting out quickly if this is just a lookup
-    if (data) {
-      if (!queue || Array.isArray(data)) {
-        dataPriv.get(elem)!.set(type, (queue = Array.from(data)));
-      } else {
-        queue.push(data);
-      }
-    }
-
-    return queue || [];
+  if (dataPriv.has(elem) === false) {
+    dataPriv.set(elem, new Map());
   }
+  // eslint-disable-next-line functional/no-let
+  let queue = dataPriv.get(elem)!.get(type);
+
+  // Speed up dequeue by getting out quickly if this is just a lookup
+  if (data) {
+    if (!queue || Array.isArray(data)) {
+      dataPriv.get(elem)!.set(type, (queue = Array.from(data)));
+    } else {
+      queue.push(data);
+    }
+  }
+
+  return queue || [];
 }
 
 function dequeue(elem: any, type = "fx"): void {
-  var queue = queue(elem, type),
-    startLength = queue.length,
-    fn = queue.shift(),
-    hooks = _queueHooks(elem, type),
+  const queues = queue(elem, type);
+  // eslint-disable-next-line functional/no-let
+  let startLength = queues.length,
+    fn = queues.shift();
+  const hooks = _queueHooks(elem, type),
     next = () => {
       dequeue(elem, type);
     };
 
   // If the fx queue is dequeued, always remove the progress sentinel
   if (fn === "inprogress") {
-    fn = queue.shift();
+    fn = queues.shift();
     startLength--;
   }
 
   if (fn) {
     if (type === "fx") {
-      queue.unshift("inprogress");
+      queues.unshift("inprogress");
     }
 
+    // eslint-disable-next-line functional/immutable-data
     delete hooks.stop;
     fn.call(elem, next, hooks);
   }
@@ -77,7 +87,8 @@ function _queueHooks(elem: any, type: string) {
   if (dataPriv.get(elem)!.has(key) === false) {
     dataPriv.get(elem)!.set(key, {
       empty: new Callbacks(() => {
-        dataPriv.remove(elem, [type + "queue", key]);
+        dataPriv.get(elem)?.delete(type + "queue");
+        dataPriv.get(elem)?.delete(key);
       }),
     });
   }
@@ -85,10 +96,11 @@ function _queueHooks(elem: any, type: string) {
   return dataPriv.get(elem)!.get(key)!;
 }
 
-function installer(Kijs) {
-  function queue(this: Kijs, data: any[] | Function): this;
-  function queue(this: Kijs, type: string, data: any[] | Function): this;
-  function queue(this: Kijs, type: any, data?: any): this {
+function installer(Ki: typeof Kijs) {
+  function queue2(this: Kijs, data: any): Kijs;
+  function queue2(this: Kijs, type: string, data: any): Kijs;
+  function queue2(this: Kijs, type: any, data?: any): Kijs {
+    // eslint-disable-next-line functional/no-let
     let setter = 2;
 
     if (typeof type !== "string") {
@@ -97,6 +109,7 @@ function installer(Kijs) {
       setter--;
     }
 
+    // eslint-disable-next-line functional/functional-parameters
     if (arguments.length < setter) {
       return queue(this[0], type);
     }
@@ -116,24 +129,24 @@ function installer(Kijs) {
     return this;
   }
 
-  Kijs.prototype.queue = queue;
-
-  Kijs.prototype.extend({
-    dequeue(type: string) {
-      return this.each(() => {
-        dequeue(this, type);
-      });
-    },
-    clearQueue(type = "fx") {
-      return this.queue(type, []);
-    },
-  });
+  // eslint-disable-next-line functional/immutable-data
+  Ki.prototype.queue = queue2;
+  // eslint-disable-next-line functional/immutable-data
+  Ki.prototype.dequeue = function (type) {
+    return this.each(() => {
+      dequeue(this, type);
+    });
+  };
+  // eslint-disable-next-line functional/immutable-data
+  Ki.prototype.clearQueue = function (type = "fx") {
+    return this.queue(type, []);
+  };
 }
 
 declare module "kijs" {
   class Kijs {
-    queue(this: Kijs, data: any[] | Function): this;
-    queue(this: Kijs, type: string, data: any[] | Function): this;
+    queue(this: Kijs, data: any): this;
+    queue(this: Kijs, type: string, data: any): this;
     dequeue(type: string): this;
     clearQueue(type: string): this;
   }

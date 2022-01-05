@@ -12,6 +12,8 @@ const banner = `/**
  * ${name} version ${version}
  * */`;
 
+const external = ["kijs"];
+
 const options = [
   {
     input: "src/index.ts",
@@ -72,6 +74,7 @@ const options = [
       //   exports: "auto",
       // },
     ],
+    external,
   },
   {
     input: "src/index.ts",
@@ -120,6 +123,7 @@ const options = [
         strict: true,
       },
     ],
+    external,
   },
   {
     input: "src/index.ts",
@@ -130,6 +134,7 @@ const options = [
       },
     ],
     plugins: [dts()],
+    external,
   },
 ];
 
